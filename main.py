@@ -10,6 +10,7 @@ def RPN(exp, op):
   stack = []
   for e in exp:
     f = op.get(e)
+    res = None
     if f is None:
       # 演算子でも変数でもない場合はstack
       stack.append(e)
