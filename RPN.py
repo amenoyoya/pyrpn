@@ -32,22 +32,62 @@ class Value:
         self.type = _type
 
 
-def eval_rpn(exp):
-    ''' 逆ポーランド記法を計算する関数
-    params:
-        exp list: 逆ポーランド記法プログラムの配列
-            el: [Value(1), Value(2), (lambda x, y: x.value + y.value)] => 1 + 2
-    '''
-    stack = []
-    for e in exp:
-        if callable(e):
-            # 関数なら関数実行
-            argc = len(signature(e).parameters) # 関数の引数の数を取得
-            res = e(*stack[-argc:]) # stackの後ろから引数を取得し、関数実行
-            stack = stack[:-argc] # 引数分をstackから削除
+def RPN(prestack):
+    ''' 逆ポーランド記法計算関数を生成するデコレータ '''
+    def wrapper(exp, *args, **kwargs):
+        ''' 逆ポーランド記法を計算する関数
+        params:
+            exp list: 逆ポーランド記法プログラムの配列
+                el: [Value(1), Value(2), (lambda x, y: x.value + y.value)] => 1 + 2
+        '''
+        
+        # stackから引数をとって関数をcallする関数
+        def call(func, stack):
+            argc = len(signature(func).parameters) # 関数の引数の数を取得
+            res = func(*stack[-argc:]) # stackの後ろから引数を取得し、関数実行
+            del stack[-argc:] # 引数分をstackから削除
             if res is not None:
                 stack.append(res) # 関数の戻り値をstack
-        else:
-            # 関数でない場合はstack
-            stack.append(e)
-    return stack
+        
+        stack = []
+        for e in exp:
+            if callable(e):
+                # 関数なら関数実行
+                call(e, stack)
+            else:
+                # stack前処理の結果をstack
+                res = prestack(e, *args, **kwargs)
+                if res is not None:
+                    if callable(res):
+                        # stack前処理が関数を返したら関数実行
+                        call(res, stack)
+                    else:
+                        stack.append(res)
+        return stack
+    return wrapper
+
+
+@RPN
+def eval_rpn(e):
+    ''' stack前処理を行わない単純なRPN処理系
+    example:
+        # 1 + 2
+        eval_rpn([Value(1), Value(2), (lambda x, y: Value(x.value + y.value))])
+    '''
+    return e
+
+
+@RPN
+def eval_rpn_variable(e, operators):
+    ''' 演算子と組み込み変数を自動判定するRPN処理系
+    example:
+        # 1 + 2
+        eval_rpn(
+            [1, 2, '+'], # RPN式
+            {'+': lambda x, y: x + y} # 演算子, 組み込み変数
+        )
+    '''
+    f = operators.get(e)
+    if f is not None:
+        return f
+    return e
