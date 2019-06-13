@@ -1,28 +1,58 @@
 # encoding: utf-8
-from RPN import eval_rpn_variable
+from RPN import Value, eval_rpn
+import sqlite3
+from contextlib import closing
 
-''' 四則演算用逆ポーランド演算 '''
+''' SQL Query Builder '''
 
-# 演算子, 組み込み変数定義
+# bind values
+binds = []
+
+# x <op> y
+def build(x, y, op):
+    global binds
+    exp = '('
+    if x.type == Value.VALUE:
+        binds += [x.value]
+        exp += '?'
+    else:
+        exp += x.value
+    exp += ' ' + op + ' '
+    if y.type == Value.VALUE:
+        binds += [y.value]
+        exp += '?'
+    else:
+        exp += y.value
+    exp += ')'
+    return Value(exp, Value.CHUNK)
+
+# 演算子定義
 op = {
-    '+': lambda x, y: x + y,
-    '-': lambda x, y: x - y,
-    '*': lambda x, y: x * y,
-    '/': lambda x, y: x / y,
-    'ten':     10,
-    'hundred': 100,
-    'pi':      3.14,
+    '<': lambda x, y: build(x, y, '<'), '<=': lambda x, y: build(x, y, '<='),
+    '>': lambda x, y: build(x, y, '>'), '>=': lambda x, y: build(x, y, '>='),
+    '=': lambda x, y: build(x, y, '='), '!=': lambda x, y: build(x, y, '!='),
+    'and': lambda x, y: build(x, y, 'and'), 'or': lambda x, y: build(x, y, 'or'),
+    'like': lambda x, y: build(x, y, 'like')
 }
 
-# 計算式定義
-## 1 2 + 3 * 4 - ten * hundred / pi +
-## => ((1 + 2) * 3 - 4) * ten / hundred + pi
-## => ((1 + 2) * 3 - 4) * 10 / 100 + 3.14
-## => 3.64
+# クエリ定義
+## id 3 < gender "male" = and gender "female" = or
+## => ((id < 3) and (gender = "male")) or (gender = "female")
+## => ((id < ?) and (gender = ?)) or (gender = ?), [3, "male", "female"]
 exp = [
-    1, 2, '+', 3, '*', 4, '-', 'ten', '*', 'hundred', '/', 'pi', '+'
+    Value('id', Value.CHUNK), Value(3), op['<'],
+    Value('gender', Value.CHUNK), Value('male'), op['='],
+    op['and'],
+    Value('gender', Value.CHUNK), Value('female'), op['='],
+    op['or']
 ]
 
 # 演算実行
-ans = eval_rpn_variable(exp, op)
-print(ans[0])
+query = eval_rpn(exp)
+print(query[0].value, binds)
+
+# sqlite3実行
+with closing(sqlite3.connect('sample.db')) as conn:
+    c = conn.cursor()
+    c.execute('select * from users where ' + query[0].value, binds)
+    print(c.fetchall())
