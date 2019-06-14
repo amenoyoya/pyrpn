@@ -4,8 +4,18 @@
 from inspect import signature
 import re
 
-class Variable:
-    ''' 変数名として使える文字列か判定するクラス '''
+class Value:
+    ''' 値クラス '''
+    VALUE = 0 # 値
+    CHUNK = 1 # 遅延評価式
+
+    def __init__(self, value, _type=VALUE):
+        self.value = value
+        self.type = _type
+
+
+class Variable(Value):
+    ''' 変数クラス '''
     class NameError(Exception):
         def __str__(self):
             return 'Invalid character specified for variable name.'
@@ -16,21 +26,8 @@ class Variable:
     def __init__(self, variable_name):
         if Variable.pattern.match(variable_name) is None:
             raise Variable.NameError()
-        self.name = variable_name
+        super(Variable, self).__init__(variable_name, Value.CHUNK)
     
-    def __str__(self):
-        return self.name
-
-
-class Value:
-    ''' 値クラス '''
-    VALUE = 0 # 値
-    CHUNK = 1 # 遅延評価式
-
-    def __init__(self, value, _type=VALUE):
-        self.value = value
-        self.type = _type
-
 
 def RPN(prestack):
     ''' 逆ポーランド記法計算関数を生成するデコレータ '''
@@ -91,3 +88,35 @@ def eval_rpn_variable(e, operators):
     if f is not None:
         return f
     return e
+
+
+def pn2rpn(operators, exp):
+    ''' ポーランド記法 => 逆ポーランド記法 変換
+    params:
+        operators(dict): {
+            演算子: function
+        },
+        exp(dict): ポーランド記法 {
+            演算子: [引数, ...],
+            演算子: {変数: 値}
+        }
+    '''
+    rpn = []
+    def convert(operators, exp, rpn):
+        for key, value in exp.items():
+            op = operators.get(key)
+            
+            if op is None:
+                rpn += [Variable(key)]
+            
+            if type(value) == dict:
+                convert(operators, value, rpn)
+            elif type(value) == list:
+                rpn += [Value(v) for v in value]
+            else:
+                rpn += [Value(value)]
+            
+            if op is not None:
+                rpn += [key]
+        return rpn
+    return convert(operators, exp, rpn)

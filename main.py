@@ -1,5 +1,5 @@
 # encoding: utf-8
-from RPN import Value, eval_rpn
+from RPN import Value, pn2rpn, eval_rpn_variable
 import sqlite3
 from contextlib import closing
 
@@ -35,20 +35,24 @@ op = {
     'like': lambda x, y: build(x, y, 'like')
 }
 
-# クエリ定義
-## id 3 < gender "male" = and gender "female" = or
+# ポーランド記法でSQLクエリ定義
+## 逆ポーランド記法: id 3 < gender "male" = and gender "female" = or
 ## => ((id < 3) and (gender = "male")) or (gender = "female")
 ## => ((id < ?) and (gender = ?)) or (gender = ?), [3, "male", "female"]
-exp = [
-    Value('id', Value.CHUNK), Value(3), op['<'],
-    Value('gender', Value.CHUNK), Value('male'), op['='],
-    op['and'],
-    Value('gender', Value.CHUNK), Value('female'), op['='],
-    op['or']
-]
+exp = pn2rpn(op, {
+    'or': {
+        'and': {
+            '<': {'id': 3},
+            '=': {'gender': 'male'},
+        },
+        '=': {'gender': 'female'},
+    },
+})
+
+print([v if type(v) == str else v.value for v in exp])
 
 # 演算実行
-query = eval_rpn(exp)
+query = eval_rpn_variable(exp, op)
 print(query[0].value, binds)
 
 # sqlite3実行
