@@ -6,22 +6,46 @@
     演算子: {変数: 値}
 }
 '''
-from RPN import Value, Variable
+from RPN import Value, Variable, eval_rpn_variable
 
-def pn2rpn(exp):
+def pn2rpn(exp, operators):
     rpn = []
-    def convert(exp, rpn):
+    def convert(exp, operators, rpn):
         for key, value in exp.items():
-            if type(key) == str:
+            op = operators[key]
+            
+            if op is None:
                 rpn += Value(str(Variable(key)), Value.CHUNK)
-
+            
             if type(value) == dict:
-                rpn += convert(value, rpn)
+                convert(value, operators, rpn)
             elif type(value) == list:
-                rpn += value
+                rpn += [Value(v) for v in value]
             else:
                 rpn += [Value(value)]
             
-            if callable(key):
+            if op is not None:
                 rpn += key
-    return convert(exp, rpn)
+        return rpn
+    return convert(exp, operators, rpn)
+
+op = {
+    '+': lambda x, y: Value(x.value + y.value),
+    '-': lambda x, y: Value(x.value - y.value),
+    '*': lambda x, y: Value(x.value * y.value),
+    '/': lambda x, y: Value(x.value / y.value),
+}
+
+rpn = pn2rpn(
+    {
+        '+': {
+            '*': {
+                '-': [123, 23],
+                '/': [50, 2]
+            },
+            '-': [550, 50]
+        }
+    }, op)
+
+print([e if type(e) == str else e.value for e in rpn])
+print([e.value for e in eval_rpn_variable(rpn, op)])
