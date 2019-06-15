@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-from rpn import RPN, Value, Variable
+from libs.rpn import RPN, Value, Variable
 
 # 日本語四則演算子
 class Calc(RPN):
