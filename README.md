@@ -109,3 +109,20 @@ python query.py
                 ```
         - return:
             - `result`(list): 逆ポーランド記法のValue配列
+
+---
+
+### SQL QueryBuilder
+
+#### class: QueryBuilder /libs/sql.py
+- description: ポーランド記法で記述されたクエリからSQLクエリを構築する
+- class methods:
+    - `query`
+        - ポーランド記法のクエリ式からSQLクエリ構築
+        - example: `query.py`参照
+        - params:
+            - `s_exp`(dict): ポーランド記法のクエリ
+        - return:
+            - `query`(str): SQLクエリ,
+            - `binds`(list): バインディングされた値(list)を取得
+        
